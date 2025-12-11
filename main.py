@@ -103,6 +103,24 @@ def quantize_qty(qty: float) -> float:
     return round(steps * QTY_STEP, 6)
 
 
+def safe_float(v) -> float:
+    """
+    Bybit néha üres stringgel vagy None-nal tér vissza.
+    Ez a helper mindig ad egy használható floatot.
+    """
+    if v is None:
+        return 0.0
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = str(v).strip()
+    if s == "":
+        return 0.0
+    try:
+        return float(s)
+    except Exception:
+        return 0.0
+
+
 # ==========================
 # BYBIT KLIENS
 # ==========================
@@ -134,6 +152,7 @@ def get_balances(session: HTTP) -> Tuple[float, float]:
     """
     Visszaadja: (sol_total, usdt_available)
     accountType=UNIFIED feltételezve.
+    safe_float-tal védve az üres stringek ellen.
     """
     resp = session.get_wallet_balance(accountType="UNIFIED", coin="SOL,USDT")
     if resp.get("retCode") != 0:
@@ -145,12 +164,13 @@ def get_balances(session: HTTP) -> Tuple[float, float]:
     for acct in resp["result"]["list"]:
         for coin in acct.get("coin", []):
             c = coin["coin"]
-            wallet_balance = float(coin.get("walletBalance", "0"))
-            available_to_withdraw = float(coin.get("availableToWithdraw", "0"))
+
+            wallet_balance = safe_float(coin.get("walletBalance"))
+            available_to_withdraw = safe_float(coin.get("availableToWithdraw"))
+
             if c == "SOL":
                 sol_total = wallet_balance
             elif c == "USDT":
-                # USDT-nél inkább az availableToWithdraw-t használjuk
                 usdt_available = available_to_withdraw
 
     return sol_total, usdt_available
